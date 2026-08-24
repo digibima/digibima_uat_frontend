@@ -18,7 +18,8 @@ const UniversalDatePicker = ({
     minDate,
     maxDate,
     defaultValue,
-    views
+    views,
+     disabled = false 
 }) => {
     return (
         <div className=''>
@@ -30,6 +31,7 @@ const UniversalDatePicker = ({
                     value={value}
                     onChange={onChange}
                     views={views}
+                    
                     defaultValue={defaultValue || null}
                     format="dd-MM-yyyy"
                     slotProps={{
@@ -37,6 +39,7 @@ const UniversalDatePicker = ({
                             fullWidth: true,
                             // placeholder,
                             variant: "outlined",
+                            disabled: disabled,
                             InputProps: {
                                 style: {
                                     backgroundColor: "#fff",

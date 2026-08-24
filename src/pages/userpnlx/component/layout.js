@@ -1,13 +1,11 @@
-// components/Layout.js
 
-import React from 'react';
-import { Sidebar } from './sidebar';
+import  Sidebar  from './sidebar';
 
 const Layout = ({ children }) => {
     return (
-        <div >
+        <div className='flex '>
             <Sidebar/>
-            <main>{children}</main>
+            <main className='w-full '>{children}</main>
         </div>
     );
 };

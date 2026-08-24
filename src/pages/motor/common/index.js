@@ -1,6 +1,6 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import Image from "next/image";
+import { useState, useEffect, useRef } from "react";
 import { showSuccess, showError } from "../../../layouts/toaster";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/router";
@@ -10,6 +10,10 @@ import { FaCar, FaMotorcycle, FaTractor } from "react-icons/fa6";
 
 export default function VehicleSelect({ usersData }) {
   const [carnumber, setCarnumber] = useState();
+  const [cities, setCities] = useState(null);
+const cityRef = useRef(null);
+
+
   const {
     register,
     watch,
@@ -26,16 +30,18 @@ export default function VehicleSelect({ usersData }) {
     },
   });
 
-  useEffect(() => {
-    reset({
-      vehicle: "car",
-      carOption: "knowcar",
-      bikeOption: "knowbike",
-      commercialOption: "knowcommercial",
-      mobile: usersData?.mobile,
-      carRegNumber: carnumber,
-    });
-  }, [usersData, carnumber]);
+useEffect(() => {
+  reset({
+    vehicle: "car",
+    carOption: "knowcar",
+    bikeOption: "knowbike",
+    commercialOption: "knowcommercial",
+    mobile: usersData?.mobile,
+    carRegNumber: carnumber,
+    carCity: cities,
+  });
+}, [usersData, carnumber, cities, reset]);
+
 
   useEffect(() => {
     async function getSavedResponse() {
@@ -45,14 +51,6 @@ export default function VehicleSelect({ usersData }) {
           "GET"
         );
         setCarnumber(response.data.carregnumber);
-        console.log("Saved response", response);
-        // if (response.data.carregnumber) {
-        //   // setValue("carRegNumber", response.data.carregnumber);
-
-        //   reset({
-        //     carRegNumber: response.data.carregnumber,
-        //   });
-        // }
       } catch (error) {
         console.error(error);
       }
@@ -65,15 +63,22 @@ export default function VehicleSelect({ usersData }) {
   const bikeOption = watch("bikeOption");
   const commercialOption = watch("commercialOption");
 
+  const getCities = async (value) => {
+    try {
+      const response = await CallApi(constant.API.MOTOR.GETCITY, "POST", {
+        city: value,
+      });
+      setCities(response);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const onSubmit = async (data) => {
-    console.log("abc data", data);
     const selected = data.vehicle;
-    console.log("Vaahan", selected);
     var payload = {
       carregnumber: data.carRegNumber,
     };
-    // console.log('im pay',payload);
-    // return ;
     if (selected === "car") {
       payload.carOption = data.carOption;
       if (data.carOption === "knowcar") {
@@ -99,12 +104,10 @@ export default function VehicleSelect({ usersData }) {
       }
     }
 
-    //console.log("Filtered Submit Payload:", payload);
-    // router.push(constant.ROUTES.MOTOR.KnowCarSlide2); /
-
     try {
       const response = await CallApi(constant.API.MOTOR.VERIFYRTO, "POST", {
         carregnumber: data.carRegNumber,
+        carCity : data.carCity
       });
       var saveresponse;
       if (response) {
@@ -113,12 +116,12 @@ export default function VehicleSelect({ usersData }) {
           "POST",
           {
             carregnumber: data.carRegNumber,
+             carCity : data.carCity
           }
         );
-        console.log(saveresponse);
       }
       if (saveresponse) {
-        router.push(constant.ROUTES.MOTOR.KnowCarSlide2);
+        router.push(constant.ROUTES.MOTOR.KNOWCARSTEPTWO);
       }
       showSuccess("Detail verified");
       // router.push({
@@ -130,6 +133,21 @@ export default function VehicleSelect({ usersData }) {
       showError("Error");
     }
   };
+
+
+useEffect(() => {
+  function handleClickOutside(event) {
+    if (cityRef.current && !cityRef.current.contains(event.target)) {
+      setCities([]); 
+    }
+  }
+
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
+
 
   return (
     <div>
@@ -143,18 +161,15 @@ export default function VehicleSelect({ usersData }) {
           </p>
 
           <div className="flex flex-col md:flex-row">
-            {/* image section */}
             <div className="w-full md:w-1/2 mb-6 flex justify-center ">
               <div className="w-32 h-20 bg-gray-100 flex items-center justify-center rounded">
-                <img src="#" alt="Vehicle" className="object-contain h-full" />
+                <Image src="#" alt="Vehicle" className="object-contain h-full" />
               </div>
             </div>
 
-            {/* form section */}
 
             <div className="w-full md:w-1/2 flex items-center justify-center">
               <div>
-                {/* Vehicle Selection */}
                 <div className="flex flex-wrap gap-4 mb-4">
                   {["car", "bike", "commercial"].map((type) => (
                     <label
@@ -189,7 +204,6 @@ export default function VehicleSelect({ usersData }) {
                   ))}
                 </div>
 
-                {/* CAR FORM */}
                 {selectedVehicle === "car" && (
                   <div className="space-y-4 ">
                     <div className="flex gap-4">
@@ -278,25 +292,44 @@ export default function VehicleSelect({ usersData }) {
                     {carOption === "newcar" && (
                       <>
                         <div className="flex flex-col md:flex-row gap-4">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col relative"  ref={cityRef}>
                             <label className="text-base md:text-base">
                               City Name
                             </label>
                             <input
                               type="text"
                               placeholder="Enter City Name"
+                        
                               {...register("carCity", {
                                 required:
                                   carOption === "newcar"
                                     ? "City name is required"
                                     : false,
+                                onChange: (e) => getCities(e.target.value),
                               })}
-                              className="w-[full] border rounded p-2 mt-1"
+                              className="w-full border rounded p-2 mt-1"
                             />
                             {errors.carCity && (
                               <p className="text-red-500 text-sm">
                                 {errors.carCity.message}
                               </p>
+                            )}
+
+                            {cities?.length > 0 && (
+                              <ul className="absolute top-full left-0 right-0 z-10 border rounded bg-white max-h-40 overflow-y-auto shadow-md mt-1">
+                                {cities.map((city, idx) => (
+                                  <li
+                                    key={idx}
+                                    onClick={() => {
+                                      setValue("carCity", city);
+                                      setCities([]);
+                                    }}
+                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    {city}
+                                  </li>
+                                ))}
+                              </ul>
                             )}
                           </div>
 
@@ -332,9 +365,8 @@ export default function VehicleSelect({ usersData }) {
                   </div>
                 )}
 
-                {/* BIKE FORM */}
                 {selectedVehicle === "bike" && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 ">
                     <div className="flex gap-4">
                       <label>
                         <input
@@ -356,7 +388,7 @@ export default function VehicleSelect({ usersData }) {
 
                     {bikeOption === "knowbike" && (
                       <>
-                        <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex flex-col md:flex-row gap-4 ">
                           <div className="flex flex-col">
                             <label className="text-base md:text-base ">
                               Bike Registration Number
@@ -450,52 +482,60 @@ export default function VehicleSelect({ usersData }) {
                   </div>
                 )}
 
-                {/* COMMERCIAL FORM */}
                 {selectedVehicle === "commercial" && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 ">
                     <div className="flex flex-col md:flex-row gap-4">
-                      <label>
-                        <input
-                          type="radio"
-                          value="knowcommercial"
-                          {...register("commercialOption")}
-                        />
-                        Know Commercial No.
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          value="newcommercial"
-                          {...register("commercialOption")}
-                        />
-                        New Commercial
-                      </label>
+                      <div className="flex gap-4">
+                        <label>
+                          <input
+                            type="radio"
+                            value="knowcommercial"
+                            {...register("commercialOption")}
+                          />
+                          Know Commercial No.
+                        </label>
+                        <label>
+                          <input
+                            type="radio"
+                            value="newcommercial"
+                            {...register("commercialOption")}
+                          />
+                          New Commercial
+                        </label>
+                      </div>
                     </div>
 
                     {commercialOption === "knowcommercial" && (
                       <>
-                        <div className="flex flex-col md:flex-row gap-4 bg-amber-400">
-                        
+                        <div className="flex flex-col md:flex-row gap-4 ">
                           <div className="flex flex-col gap-2">
-                          <div className="flex flex-col">
-                            <label>Registration Number</label>
-                            <input
-                              type="text"
-                              placeholder="Enter Commercial Reg. Number"
-                              {...register("commercialRegNumber")}
-                              className="w-full border rounded p-2"
-                            />
-                          </div>
+                            <div className="flex flex-col">
+                              <label>Registration Number</label>
+                              <input
+                                type="text"
+                                placeholder="Enter Commercial Reg. Number"
+                                {...register("commercialRegNumber")}
+                                className="w-full border rounded p-2"
+                              />
+                            </div>
 
-                           <div className="flex flex-col">
+                            <div className="flex flex-col">
                               <label>Vehicle Type</label>
-                              <select name="commercialVehicle" id="comVehicle" className="p-1">
+                              <select
+                                name="commercialVehicle"
+                                id="comVehicle"
+                                className="p-1"
+                              >
                                 <option>Vehicle Type</option>
-                                <option value="">Passenger Carrying Commercial Vehicle</option>
-                                <option value="">Goods Carrying Commercial Vehicles</option>
+                                <option value="">
+                                  Passenger Carrying Commercial Vehicle
+                                </option>
+                                <option value="">
+                                  Goods Carrying Commercial Vehicles
+                                </option>
                               </select>
                             </div>
-                            </div>
+                          </div>
 
                           <div className="flex flex-col">
                             <label>Mobile Number</label>
@@ -567,7 +607,6 @@ export default function VehicleSelect({ usersData }) {
                   </button>
                 </div>
 
-                {/* Footer Text */}
                 <p className="mt-4 text-base md:text-lg">
                   Already bought a policy from DigiBima?{" "}
                   <a href="#" className="text-blue-600 underline">

@@ -124,7 +124,7 @@ const Plans = () => {
                           <span className="text-red-600">
                             Personal Accident cover of ₹15 Lakhs
                           </span>
-                          . Please opt for 'Personal Accident (PA) Cover'.
+                          . Please opt for &apos;Personal Accident (PA) Cover&apos;.
                         </p>
                       )}
                     </div>
@@ -327,7 +327,7 @@ const Plans = () => {
                           {activeTab === "Tab1" && (
                             <div className="p-2">
                               <p className=" mb-4 text-gray-600">
-                                Select the addons you'd like to add.
+                                Select the addons you&apos;d like to add.
                               </p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                 {addons.map((addon, index) => (

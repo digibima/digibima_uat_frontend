@@ -25,7 +25,6 @@ const Modal = ({ isOpen, onClose, children }) => {
           show ? "opacity-100 scale-110" : "opacity-0 scale-95"
         }`}
       >
-        {/* X button */}
         <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 text-xl font-bold"
@@ -33,7 +32,6 @@ const Modal = ({ isOpen, onClose, children }) => {
           &times;
         </button>
 
-        {/* Modal content */}
         {children}
       </div>
     </div>

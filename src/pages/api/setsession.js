@@ -3,7 +3,7 @@ import { encryptData } from './crypt'; // Example encryption utility functions
 
 export default async function handler(req, res) {
   const { token } = req.body;
-  console.log('body',req.body);
+  // console.log('body',req.body);
   // const encryptedToken = await encryptData(token);
   const encryptedToken = token;
   if (encryptedToken) {

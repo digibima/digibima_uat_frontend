@@ -1,4 +1,3 @@
-// utils/toaster.js
 import { toast } from 'react-hot-toast';
 
 export const showSuccess = (message) => {
@@ -10,7 +9,7 @@ export const showSuccess = (message) => {
 
 export const showError = (message) => {
   toast.error(message, {
-    duration: 3000,
+    // duration: 3000,
     position: 'top-center',
   });
 };
