@@ -226,7 +226,6 @@ export default function StepTwoForm({
           console.error("proposer_details parse error", err);
         }
 
-        // ========= Bank Details Autofill Fix =========
         const raw = res.bank_details;
         if (raw) {
           const bankData =
@@ -249,7 +248,6 @@ export default function StepTwoForm({
           }
         }
 
-        // ========= Annual Income Autofill Fix =========
         const savedIncome =
           propDetailsObj?.annual_income ||
           propDetailsObj?.annualincome ||
@@ -328,7 +326,6 @@ export default function StepTwoForm({
             );
           }
 
-          // ========= Appointee DOB Autofill Fix =========
           const appDob = nomineeData.appointee_dob || nomineeData.appointeedob;
           if (appDob) {
             step2Form.setValue("appointeedob", appDob);
@@ -409,30 +406,33 @@ export default function StepTwoForm({
       const attachField = suffix
         ? `${prefix}attachmentdate${suffix}`
         : `${prefix}attachmentdate`;
+      const occField = suffix
+        ? `${prefix}occupation${suffix}`
+        : `${prefix}occupation`;
 
       step2Form.setValue(`${prefix}name${suffix}`, apiMember?.name || "");
       step2Form.setValue(`${prefix}height${suffix}`, apiMember?.height || "");
       step2Form.setValue(`${prefix}inches${suffix}`, apiMember?.inch || "");
       step2Form.setValue(`${prefix}weight${suffix}`, apiMember?.weight || "");
 
-      // ========= Member Occupation & Nature of Duty Autofill Fix =========
-      if (!isChild) {
-        const mOcc =
-          apiMember?.occupation ||
-          apiMember?.proposer_details?.occupation ||
-          "";
-        if (mOcc && occupationdata.length > 0) {
-          const matchedOcc = occupationdata.find(
-            (o) =>
-              String(o.value) === String(mOcc) ||
-              o.label?.toLowerCase() === String(mOcc).toLowerCase()
-          );
-          step2Form.setValue(
-            `${prefix}occupation${suffix}`,
-            matchedOcc ? matchedOcc.value : mOcc
-          );
-        }
+      // Occupation Autofill for ALL Members (including Kids)
+      const mOcc =
+        apiMember?.occupation ||
+        apiMember?.proposer_details?.occupation ||
+        "";
+      if (mOcc && occupationdata.length > 0) {
+        const matchedOcc = occupationdata.find(
+          (o) =>
+            String(o.value) === String(mOcc) ||
+            o.label?.toLowerCase() === String(mOcc).toLowerCase()
+        );
+        step2Form.setValue(
+          occField,
+          matchedOcc ? matchedOcc.value : mOcc
+        );
+      }
 
+      if (!isChild) {
         const mDuty =
           apiMember?.nature_of_duty ||
           apiMember?.proposer_details?.nature_of_duty ||
@@ -444,7 +444,7 @@ export default function StepTwoForm({
               n.label?.toLowerCase() === String(mDuty).toLowerCase()
           );
           step2Form.setValue(
-            `${prefix}natureofduty${suffix}`,
+            `${prefix}natureofduty`,
             matchedDuty ? matchedDuty.value : mDuty
           );
         }
@@ -681,7 +681,7 @@ export default function StepTwoForm({
           <Controller
             name="natureofduty"
             control={control}
-            rules={{ required: "Please select an Nature of Duty" }}
+            rules={{ required: "Please select Nature of Duty" }}
             render={({ field, fieldState: { error } }) => (
               <>
                 <DropdownWithSearch
@@ -792,7 +792,7 @@ export default function StepTwoForm({
             className={inputClass}
             maxLength={20}
             onInput={(e) => {
-              e.target.value = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+              e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
             }}
           />
         </div>
@@ -859,6 +859,10 @@ export default function StepTwoForm({
             ? "husband"
             : "spouse"
           : "";
+
+        const occFieldName = isChild
+          ? `${prefix}occupation${suffix}`
+          : `${prefix}occupation`;
 
         return (
           <div key={index} className="mt-6 space-y-3">
@@ -960,68 +964,67 @@ export default function StepTwoForm({
                 </div>
               )}
 
-              {!isChild && (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Occupation
-                    </label>
-                    <Controller
-                      name={`${prefix}occupation`}
-                      control={control}
-                      rules={{ required: "Please select an Occupation" }}
-                      render={({ field, fieldState: { error } }) => (
-                        <>
-                          <DropdownWithSearch
-                            id={`${prefix}occupation`}
-                            name={`${prefix}occupation`}
-                            options={occupationdata}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select Occupation"
-                            className="inputcls"
-                            allowOnlyAlphabets={true}
-                            onKeyDown={handleAlphabetOnlyKeyDown}
-                          />
-                          {error && (
-                            <p className="text-red-500 text-sm mt-1">
-                              {error.message}
-                            </p>
-                          )}
-                        </>
+              {/* Occupation Field for ALL Members (including Kids) */}
+              <div className="flex flex-col gap-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Occupation
+                </label>
+                <Controller
+                  name={occFieldName}
+                  control={control}
+                  rules={{ required: "Please select an Occupation" }}
+                  render={({ field, fieldState: { error } }) => (
+                    <>
+                      <DropdownWithSearch
+                        id={occFieldName}
+                        name={occFieldName}
+                        options={occupationdata}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select Occupation"
+                        className="inputcls"
+                        allowOnlyAlphabets={true}
+                        onKeyDown={handleAlphabetOnlyKeyDown}
+                      />
+                      {error && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {error.message}
+                        </p>
                       )}
-                    />
-                  </div>
+                    </>
+                  )}
+                />
+              </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nature of Duty
-                    </label>
-                    <Controller
-                      name={`${prefix}natureofduty`}
-                      control={control}
-                      rules={{ required: "Please select Nature of Duty" }}
-                      render={({ field, fieldState: { error } }) => (
-                        <>
-                          <DropdownWithSearch
-                            id={`${prefix}natureofduty`}
-                            name={`${prefix}natureofduty`}
-                            options={natureofdutydata}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select Nature of Duty"
-                            className="inputcls"
-                          />
-                          {error && (
-                            <p className="text-red-500 text-sm mt-1">
-                              {error.message}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    />
-                  </div>
-                </>
+              {!isChild && (
+                <div className="flex flex-col gap-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nature of Duty
+                  </label>
+                  <Controller
+                    name={`${prefix}natureofduty`}
+                    control={control}
+                    rules={{ required: "Please select Nature of Duty" }}
+                    render={({ field, fieldState: { error } }) => (
+                      <>
+                        <DropdownWithSearch
+                          id={`${prefix}natureofduty`}
+                          name={`${prefix}natureofduty`}
+                          options={natureofdutydata}
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Select Nature of Duty"
+                          className="inputcls"
+                        />
+                        {error && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {error.message}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  />
+                </div>
               )}
 
               {isChild && (
@@ -1246,6 +1249,7 @@ export default function StepTwoForm({
                   required: isNomineeMinor
                     ? "Appointee DOB is required"
                     : false,
+                  
                 }}
                 render={({ field, fieldState }) => (
                   <UniversalDatePicker

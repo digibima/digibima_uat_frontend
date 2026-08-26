@@ -13,40 +13,38 @@ export default function ThankYou() {
   const router = useRouter();
   const [policyData, setPolicyData] = useState(null);
 
-  // ================= Fetch Policy API =================
-
 
   // ================= URL Validation =================
-useEffect(() => {
-  if (!router.isReady) return;
+  useEffect(() => {
+    if (!router.isReady) return;
 
-  const policyNumber = router.query.policyNumber;
-  const policyurl = router.query.policyurl;
+    const policyNumber = router.query.policyNumber;
+    const proposalNumber = router.query.proposalNumber; 
+    const policyurl = router.query.policyurl;
 
-  // console.log("policyNumber =>", policyNumber);
+    if (
+      router.asPath.includes("policyNumber=") &&
+      (!policyNumber || policyNumber === "") &&
+      !proposalNumber
+    ) {
+      setPolicyData({ pending: true });
+      setLoading(false);
+      return;
+    }
 
-  // Underwriting case
-if (
-  router.asPath.includes("policyNumber=") &&
-  (!policyNumber || policyNumber === "")
-) {
-  setPolicyData({ pending: true });
-  setLoading(false);
-  return;
-}
-  // Policy generated case
-  if (policyNumber) {
-    setPolicyData({
-      policy: policyNumber,
-      policyURL: policyurl,
-    });
+    if (policyNumber || proposalNumber) {
+      setPolicyData({
+        policy: policyNumber || null,
+        proposal: proposalNumber || null,
+        policyURL: policyurl,
+      });
+
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
-    return;
-  }
-
-  setLoading(false);
-},  [router.isReady, router.query, router.asPath]);
+  }, [router.isReady, router.query, router.asPath]);
 
   // ================= UI =================
   return (
@@ -63,11 +61,9 @@ if (
             </h2>
 
             <p className="text-sm text-gray-500">
-  Your policy is currently under underwriting review.
-  Once approved, your policy document will be generated and shared with you.
-</p>
-
-        
+              Your policy is currently under underwriting review. Once approved,
+              your policy document will be generated and shared with you.
+            </p>
           </div>
         ) : (
           <div className="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-md space-y-6 text-center border border-blue-100">
@@ -94,24 +90,29 @@ if (
             </div>
 
             <p className="text-gray-700">
-              Your policy has been successfully generated.
+              Your {policyData.policy ? "policy" : "proposal"} has been
+              successfully generated.
             </p>
 
             <p className="text-md mt-4 mb-3 text-black font-semibold">
-              <strong>Policy Number:</strong>
+              <strong>
+                {policyData.policy ? "Policy Number:" : "Proposal Number:"}
+              </strong>
               <br />
-              {policyData.policy}
+              {policyData.policy || policyData.proposal}
             </p>
 
-            <a
-              href={policyData.policyURL}
-              className="thmbtn text-white font-semibold py-3 rounded-md flex items-center justify-center gap-2"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <i className="fas fa-download mr-2"></i>
-              Download Policy
-            </a>
+            {policyData.policyURL && (
+              <a
+                href={policyData.policyURL}
+                className="thmbtn text-white font-semibold py-3 rounded-md flex items-center justify-center gap-2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <i className="fas fa-download mr-2"></i>
+                Download Policy
+              </a>
+            )}
           </div>
         )
       ) : (

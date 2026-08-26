@@ -361,109 +361,166 @@ const stored = sessionStorage.getItem(
     }
   };
 
-  const validateFormStepTwo = async () => {
-    const values = step2Form.getValues();
-    console.log("values",values);
-    if (String(planType) != 2) {
-      Object.keys(values).forEach((k) => {
-        if (k.includes("attachmentdate")) {
-          delete values[k];
-        }
-      });
-    }
-    const fieldsValid = await validateFields(step2Form);
-    if (!fieldsValid) return false;
-    const rawValues = step2Form.getValues();
-    const nomineeDob = values.nomineedob;
-    const validAge = validateStepTwoData(values, steponedata);
-    if (!validAge) return false;
+const validateFormStepTwo = async () => {
+  const values = step2Form.getValues();
+  console.log("values", values);
 
-    // ========= Step 2 Attachment Validation =========
-    if (String(planType) == 2) {
-      for (let key in values) {
-        if (!key.includes("attachmentdate")) continue;
-
-        const attachmentDate = values[key];
-
-        let dob = "";
-
-        // proposer special case
-        if (key === "proposerattachmentdate") {
-          dob = values.proposerdob2;
-        } else {
-          const dobKey = key.replace("attachmentdate", "dob");
-          dob = values[dobKey];
-        }
-
-        const result = validateAttachmentStepTwo(dob, attachmentDate);
-
-        if (result !== true) {
-          const label = getMemberLabelFromKey(key, steponedata);
-
-          const finalMsg = `${label}  ${result}`;
-
-          step2Form.setError(key, {
-            type: "manual",
-            message: finalMsg,
-          });
-
-          step2Form.setFocus(key);
-
-          showError(finalMsg);
-
-          return false;
-        }
+  if (String(planType) != 2) {
+    Object.keys(values).forEach((k) => {
+      if (k.includes("attachmentdate")) {
+        delete values[k];
       }
-    }
-    // =============================================
-    // ========= Occupation Validation Fix (With Toast) =========
-      let isOccupationValid = true;
-      for (const key of Object.keys(values)) {
-        if (key.includes("occupation")) {
-          const val = values[key];
+    });
+  }
 
-          if (!val || val === "no-selection") {
-            const label = getMemberLabelFromKey(key, steponedata) || "Member";
-            const msg = `${label}: Please select an Occupation`;
-            step2Form.setError(key, {
+  // ========= Appointee DOB Age Check (< 18 Strict Validation) =========
+  const nomineeDob = values.nomineedob;
+  if (nomineeDob) {
+    try {
+      const parsedNomineeDob = parse(nomineeDob, "dd-MM-yyyy", new Date());
+      const today = new Date();
+
+      if (!isNaN(parsedNomineeDob)) {
+        let nomineeAge = today.getFullYear() - parsedNomineeDob.getFullYear();
+        const mDiff = today.getMonth() - parsedNomineeDob.getMonth();
+        if (mDiff < 0 || (mDiff === 0 && today.getDate() < parsedNomineeDob.getDate())) {
+          nomineeAge--;
+        }
+
+        if (nomineeAge < 18) {
+          const appointeedob = values.appointeedob;
+
+          if (!appointeedob) {
+            step2Form.setError("appointeedob", {
               type: "manual",
-              message: "Please select an Occupation",
+              message: "Appointee DOB is required",
             });
+            step2Form.setFocus("appointeedob");
+            showError("Appointee DOB is required");
+            return false;
+          }
 
-            step2Form.setFocus(key);
+          const parsedAppointeeDob = parse(appointeedob, "dd-MM-yyyy", new Date());
+          
+          if (isNaN(parsedAppointeeDob)) {
+            step2Form.setError("appointeedob", {
+              type: "manual",
+              message: "Invalid Appointee DOB",
+            });
+            step2Form.setFocus("appointeedob");
+            showError("Invalid Appointee DOB");
+            return false;
+          }
 
-            showError(msg);
+          let appointeeAge = today.getFullYear() - parsedAppointeeDob.getFullYear();
+          const appMDiff = today.getMonth() - parsedAppointeeDob.getMonth();
+          if (appMDiff < 0 || (appMDiff === 0 && today.getDate() < parsedAppointeeDob.getDate())) {
+            appointeeAge--;
+          }
 
-            isOccupationValid = false;
-            break; 
+          if (appointeeAge < 18) {
+            const errorMsg = "Appointee age must be 18 years or above";
+            step2Form.setError("appointeedob", {
+              type: "manual",
+              message: errorMsg,
+            });
+            step2Form.setFocus("appointeedob");
+            showError(errorMsg);
+            return false; 
           }
         }
       }
+    } catch (err) {
+      console.error("Appointee DOB Validation Error:", err);
+    }
+  }
+  // ====================================================================
 
-      if (!isOccupationValid) return false;
-      // ==========================================================
+  const fieldsValid = await validateFields(step2Form);
+  if (!fieldsValid) return false;
 
-    try {
-      setLoading(true);
-      const res = await CallApi(
-        constant.API.HEALTH.ADITYABIRLA.SAVESTEPTWO,
-        "POST",
-        values,
-      );
-      if (res === 1 || res?.status) {
-        setStepTwoData(res);
-        return true;
+  const validAge = validateStepTwoData(values, steponedata);
+  if (!validAge) return false;
+
+  // ========= Step 2 Attachment Validation =========
+  if (String(planType) == 2) {
+    for (let key in values) {
+      if (!key.includes("attachmentdate")) continue;
+
+      const attachmentDate = values[key];
+      let dob = "";
+
+      if (key === "proposerattachmentdate") {
+        dob = values.proposerdob2;
       } else {
-        console.error("Step 2 API failed or returned unexpected value:", res);
+        const dobKey = key.replace("attachmentdate", "dob");
+        dob = values[dobKey];
+      }
+
+      const result = validateAttachmentStepTwo(dob, attachmentDate);
+
+      if (result !== true) {
+        const label = getMemberLabelFromKey(key, steponedata);
+        const finalMsg = `${label}  ${result}`;
+
+        step2Form.setError(key, {
+          type: "manual",
+          message: finalMsg,
+        });
+
+        step2Form.setFocus(key);
+        showError(finalMsg);
         return false;
       }
-    } catch (error) {
-      console.error("Step 2 API call error:", error);
-      return false;
-    } finally {
-      setLoading(false);
     }
-  };
+  }
+
+  // ========= Occupation Validation Fix (With Toast) =========
+  let isOccupationValid = true;
+  for (const key of Object.keys(values)) {
+    if (key.includes("occupation")) {
+      const val = values[key];
+
+      if (!val || val === "no-selection") {
+        const label = getMemberLabelFromKey(key, steponedata) || "Member";
+        const msg = `${label}: Please select an Occupation`;
+        step2Form.setError(key, {
+          type: "manual",
+          message: "Please select an Occupation",
+        });
+
+        step2Form.setFocus(key);
+        showError(msg);
+
+        isOccupationValid = false;
+        break;
+      }
+    }
+  }
+
+  if (!isOccupationValid) return false;
+
+  try {
+    setLoading(true);
+    const res = await CallApi(
+      constant.API.HEALTH.ADITYABIRLA.SAVESTEPTWO,
+      "POST",
+      values
+    );
+    if (res === 1 || res?.status) {
+      setStepTwoData(res);
+      return true;
+    } else {
+      console.error("Step 2 API failed or returned unexpected value:", res);
+      return false;
+    }
+  } catch (error) {
+    console.error("Step 2 API call error:", error);
+    return false;
+  } finally {
+    setLoading(false);
+  }
+};
 
   const validateFormExtraStep = async () => {
     const membersRaw = portMemberData || {};
@@ -912,9 +969,9 @@ const validateFormStepThree = async (step3Form, steptwodata) => {
     // =========================================================
     // 3. STRICT PED COUNT LIMIT CHECK (MAX 3)
     // =========================================================
-    const pedMembersCount = result.length; // Members having selected PEDs
+    const pedMembersCount = result.length; 
 
-    let totalPedQuestionsCount = 0; // Total selected PED questions across all members
+    let totalPedQuestionsCount = 0; 
     result.forEach((m) => {
       totalPedQuestionsCount += m.data ? m.data.length : 0;
     });
@@ -1011,8 +1068,7 @@ const validateFormStepThree = async (step3Form, steptwodata) => {
       amount: paymentData.data?.amount,
     };
 
-    // console.log("CREATE POLICY PAYLOAD =>", payload);
-// return false;
+
     const res = await CallApi(
       constant.API.HEALTH.ADITYABIRLA.CREATEPOLICY,
       "POST",
