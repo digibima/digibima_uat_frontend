@@ -136,7 +136,6 @@ export default function Plans() {
       const incomingVId = incoming.vendorId || incoming.vid || incoming.vendorid || incoming.value;
       const incomingProduct = String(incoming.productName || incoming.productname || incoming.product || "").toLowerCase().trim();
 
-
       if (String(incoming.status) === "0" || incoming.status === false) {
         setVendorPlans((prevPlans) => 
           prevPlans.filter((p) => {
@@ -217,7 +216,6 @@ export default function Plans() {
       socket.disconnect();
     };
   }, []);
-
 
   useEffect(() => {
     async function getDetails() {
@@ -324,9 +322,7 @@ export default function Plans() {
         );
       } catch (error) {
         console.error("Error loading plan data:", error);
-      } finally {
-        if (!socketId) setLoading(false);
-      }
+      } 
     }
     getDetails();
   }, [shouldRefetch, socketId]);
@@ -734,13 +730,25 @@ export default function Plans() {
         savingAddons={savingAddons}
       />
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 py-6">
-        {/* Left: VendorCard Section (9 columns) */}
-        <div className="lg:col-span-9">
+      {/* Responsive Wrapper with CSS Flex Order for Mobile Screens */}
+      <div className="max-w-7xl mx-auto flex flex-col lg:grid lg:grid-cols-12 gap-6 py-6">
+        
+        {/* Mobile View: Vehicle Card (Order 1) */}
+        {vehicleDetails && Object.keys(vehicleDetails).length > 0 && (motortype === "knowcar" || motortype === "newcar") && (
+          <div className="order-1 lg:hidden bg-white rounded-2xl shadow-sm p-6 text-sm mb-2">
+            <VehicleCard
+              vehicleDetails={vehicleDetails}
+              title={motortype === "knowcar" ? "Private Car" : "New Car"}
+              icon={<FaCar className="text-blue-600 text-xl" />}
+            />
+          </div>
+        )}
+
+        {/* VendorCard Plans Section (Mobile: Order 2 | Desktop: 9 Columns) */}
+        <div className="order-2 lg:order-none lg:col-span-9">
           <div className="grid grid-cols-1 gap-6">
             {vendorPlans
               .filter((plan) => {
-                
                 return plan?.socketStatus === "1";
               })
               .map((plan) => (
@@ -774,8 +782,9 @@ export default function Plans() {
           </div>
         </div>
 
-        <div className="lg:col-span-3">
-          <div className="bg-white rounded-2xl shadow-sm p-6 text-sm sticky top-6 mb-10">
+        {/* Sidebar Section (Mobile: Order 3 | Desktop: 3 Columns) */}
+        <div className="order-3 lg:order-none lg:col-span-3">
+          <div className="hidden lg:block bg-white rounded-2xl shadow-sm p-6 text-sm sticky top-6 mb-10">
             {vehicleDetails && Object.keys(vehicleDetails).length > 0 && (motortype === "knowcar" || motortype === "newcar") && (
               <VehicleCard
                 vehicleDetails={vehicleDetails}

@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 export default function VehicleCard({
@@ -13,6 +13,9 @@ export default function VehicleCard({
   const router = useRouter();
   const pathname = usePathname();
 
+  // Mobile toggle state for car view
+  const [showAllCarDetails, setShowAllCarDetails] = useState(false);
+
   const isStepFour = currentStep === 4;
   const isJourneyPage =
     pathname.includes("/motor/car/vendor/shriram/journey") ||
@@ -23,7 +26,6 @@ export default function VehicleCard({
 
   if (!vehicleDetails) return null;
 
-  // Key ko automated Capital/Clean text mein convert karne ke liye function (No hardcoded keys)
   const formatKeyName = (key) => {
     return key
       .replace(/_/g, " ")
@@ -32,13 +34,26 @@ export default function VehicleCard({
       .trim();
   };
 
-  // Safe Value Helper: missing/empty hone par "--" return karega
   const getValue = (val) => {
     if (val === null || val === undefined || String(val).trim() === "") {
       return "--";
     }
     return String(val);
   };
+
+  // Car details key checking for filtered mobile view
+  const isEssentialCarKey = (key) => {
+    const lowerKey = key.toLowerCase();
+    return (
+      lowerKey.includes("brand") ||
+      lowerKey.includes("make") ||
+      lowerKey.includes("regnumber") ||
+      lowerKey.includes("reg_number") ||
+      lowerKey.includes("registration_number")
+    );
+  };
+
+  const carEntries = Object.entries(vehicleDetails);
 
   return (
     <>
@@ -51,26 +66,43 @@ export default function VehicleCard({
 
       <div className="text-sm text-gray-700 divide-y divide-gray-200">
         {isCar ? (
-          /* CAR KE CASE MEIN: Peera object dynamic loop ho kar saare key-value print honge */
-          Object.entries(vehicleDetails).map(([key, val]) => (
-            <div key={key} className="flex justify-between py-2 gap-4">
-              <span className="font-medium text-gray-600">
-                {formatKeyName(key)}:
-              </span>
-              <span
-                className={`font-bold text-right ${
-                  key === "policy_expiry" &&
-                  String(val).toLowerCase() === "expired"
-                    ? "text-red-600"
-                    : "text-gray-900"
-                }`}
-              >
-                {getValue(val)}
-              </span>
-            </div>
-          ))
+          <>
+            {carEntries.map(([key, val]) => {
+              const isEssential = isEssentialCarKey(key);
+              return (
+                <div
+                  key={key}
+                  className={`flex justify-between py-2 gap-4 ${
+                    !isEssential && !showAllCarDetails ? "hidden sm:flex" : "flex"
+                  }`}
+                >
+                  <span className="font-medium text-gray-600">
+                    {formatKeyName(key)}:
+                  </span>
+                  <span
+                    className={`font-bold text-right ${
+                      key === "policy_expiry" &&
+                      String(val).toLowerCase() === "expired"
+                        ? "text-red-600"
+                        : "text-gray-900"
+                    }`}
+                  >
+                    {getValue(val)}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Mobile View Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setShowAllCarDetails((prev) => !prev)}
+              className="sm:hidden w-full text-center py-2 text-indigo-600 font-semibold text-xs uppercase tracking-wider hover:underline focus:outline-none"
+            >
+              {showAllCarDetails ? "View Less ▲" : "View More ▼"}
+            </button>
+          </>
         ) : (
-          /* BIKE / OTHER CASES MEIN: Specific Standard Fields */
           <>
             <div className="flex justify-between py-2">
               <span className="font-medium">RTO City:</span>

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { isAlpha, isNumber } from "@/styles/js/validation";
-import { FiLoader } from "react-icons/fi";
+import { FiLoader, FiUploadCloud, FiCheckCircle } from "react-icons/fi";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import UniversalDatePicker from "../../../../../datepicker/index";
 import { CallApi } from "@/api";
@@ -47,18 +47,19 @@ export default function StepOneForm({
   setIsOtherKycHidden,
 }) {
   const [mediaPreview, setMediaPreview] = useState(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docUploaded, setDocUploaded] = useState(false);
   const [dates, setDates] = useState({
     pancardno: "",
     aadhar: "",
     proposal: "",
   });
-const normalizeDate = (date) => {
-  if (!date) return "";
 
-  return date.includes("/")
-    ? date.replaceAll("/", "-")
-    : date;
-};
+  const normalizeDate = (date) => {
+    if (!date) return "";
+    return date.includes("/") ? date.replaceAll("/", "-") : date;
+  };
+
   const handleDateChange = useCallback(
     (key, field) => (date) => {
       const formatted = format(date, "dd-MM-yyyy");
@@ -67,6 +68,7 @@ const normalizeDate = (date) => {
     },
     [step1Form]
   );
+
   const handlePincodeInput = useCallback(
     async (e) => {
       const value = e.target.value;
@@ -95,7 +97,123 @@ const normalizeDate = (date) => {
     },
     [step1Form]
   );
-  //------------------------- verifiy already ----------------------------
+
+  // ---------------- Document OCR Handler ----------------
+  const handleDocumentUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setDocLoading(true);
+    try {
+      const response = await fetch(
+        "https://api.digibima.in/python/document/gettext",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const resData = await response.json();
+      console.log(response);
+      console.log("resData", resData);
+
+      if (resData?.status && resData?.data) {
+        const data = resData.data;
+        showSuccess("Document details extracted successfully!");
+        setDocUploaded(true);
+
+        // Auto-populate Father's Name into Proofs state & Form
+        if (data.father_name) {
+          setProofs((prev) => ({
+            ...prev,
+            fatherName: data.father_name,
+          }));
+          step1Form.setValue("fathername", data.father_name, { shouldValidate: true });
+        }
+
+        // Auto-populate Name
+        if (data.name) {
+          step1Form.setValue("name", data.name, { shouldValidate: true });
+          step1Form.setValue("proposername", data.name, { shouldValidate: true });
+        }
+
+        // Auto-populate DOB
+        if (data.dob) {
+          const formattedDob = normalizeDate(data.dob);
+          step1Form.setValue("proposaldob", formattedDob, { shouldValidate: true });
+          step1Form.setValue("proposerdob1", formattedDob, { shouldValidate: true });
+        }
+
+        // Auto-populate Gender Prefix
+        if (data.gender) {
+          const gen = data.gender.toUpperCase();
+          const genderPrefix = gen.includes("FEMALE") || gen === "F" ? "Ms" : "Mr";
+          step1Form.setValue("mr_ms_gender", genderPrefix, { shouldValidate: true });
+        }
+
+        // Auto-populate Mobile
+        if (data.mobile) {
+          step1Form.setValue("contactmobile", data.mobile, { shouldValidate: true });
+        }
+
+        // Auto-populate Address fields
+        if (data.address) {
+          step1Form.setValue("address", data.address, { shouldValidate: true });
+        }
+        if (data.colony) {
+          step1Form.setValue("colony", data.colony, { shouldValidate: true });
+        }
+        if (data.landmark) {
+          step1Form.setValue("landmark", data.landmark, { shouldValidate: true });
+        }
+        if (data.city || data.district) {
+          step1Form.setValue("city", data.city || data.district, { shouldValidate: true });
+        }
+        if (data.state) {
+          step1Form.setValue("state", data.state, { shouldValidate: true });
+        }
+        if (data.pincode) {
+          step1Form.setValue("pincode", data.pincode, { shouldValidate: true });
+          handlePincodeInput({ target: { name: "pincode", value: data.pincode } });
+        } else if (data.address) {
+          const matchedPin = data.address.match(/\b\d{6}\b/);
+          if (matchedPin && matchedPin[0]) {
+            const pin = matchedPin[0];
+            step1Form.setValue("pincode", pin, { shouldValidate: true });
+            handlePincodeInput({ target: { name: "pincode", value: pin } });
+          }
+        }
+      } else {
+        showError("Unable to extract details from the uploaded file.");
+      }
+    } catch (err) {
+      console.error("Document upload API error:", err);
+      showError("Failed to upload and parse document.");
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
+  // Sync hidden "name" & "proposaldob" fields with "proposername" & "proposerdob1"
+  const proposerNameWatch = step1Form.watch("proposername");
+  const proposerDobWatch = step1Form.watch("proposerdob1");
+
+  useEffect(() => {
+    if (proposerNameWatch) {
+      step1Form.setValue("name", proposerNameWatch, { shouldValidate: true });
+    }
+  }, [proposerNameWatch, step1Form]);
+
+  useEffect(() => {
+    if (proposerDobWatch) {
+      step1Form.setValue("proposaldob", proposerDobWatch, { shouldValidate: true });
+    }
+  }, [proposerDobWatch, step1Form]);
+
+  //------------------------- verify already ----------------------------
   const hasPrefilledUsersData = React.useRef(false);
   useEffect(() => {
     if (!kycData) return;
@@ -145,7 +263,6 @@ const normalizeDate = (date) => {
     step1Form,
   ]);
 
-
   useEffect(() => {
     if (!journeydata) return;
     if (cardata?.under === "company") {
@@ -171,6 +288,7 @@ const normalizeDate = (date) => {
 
     const directFields = {
       proposername: "kyc_name",
+      name: "kyc_name",
       mr_ms_gender: "mr_mrs",
       email: "email",
       contactmobile: "mobile",
@@ -193,10 +311,6 @@ const normalizeDate = (date) => {
         });
       }
     });
-
-    // step1Form.setValue("email", usersData.email || "");
-    // step1Form.setValue("contactmobile", usersData.mobile || "");
-    // step1Form.setValue("pincode", usersData.pincode || "");
   }, [usersData, step1Form, handlePincodeInput]);
 
   const isPanAlreadyVerified = isPanVerified;
@@ -227,6 +341,7 @@ const normalizeDate = (date) => {
             "proposal",
             "proposerdob1"
           )(new Date(`${yyyy}-${mm}-${dd}`));
+          set("proposaldob", verifieddata.dob);
         } else if (apiKey === "gender") {
           const g = verifieddata.gender?.toUpperCase();
           set(formKey, g === "M" ? "Mr" : g === "F" ? "Ms" : "");
@@ -241,6 +356,7 @@ const normalizeDate = (date) => {
     }`.trim();
     if (fullName) {
       set("proposername", fullName);
+      set("name", fullName);
       set("customerAadharName", fullName);
     }
 
@@ -301,6 +417,7 @@ const normalizeDate = (date) => {
     ],
     address: ["AADHAR", "PASSPORT", "VOTER ID", "DRIVING LICENSE", "FORM 60"],
   };
+
   const proofValidationRules = {
     AADHAR: { maxLength: 4, inputMode: "numeric", pattern: "\\d*" },
     PAN: { maxLength: 10, inputMode: "text", pattern: "[A-Z0-9]*" },
@@ -321,12 +438,12 @@ const normalizeDate = (date) => {
         }
       };
       step1Form.setValue("mr_ms_gender", journeydata.gender || "");
-      step1Form.setValue("proposername", journeydata.name || "" || "");
-
+      step1Form.setValue("proposername", journeydata.name || "");
+      step1Form.setValue("name", journeydata.name || "");
       step1Form.setValue("proposerdob1", journeydata.dob || "");
+      step1Form.setValue("proposaldob", journeydata.dob || "");
 
       const contact = safeParse(journeydata.contact_details);
-      // step1Form.setValue("contactmobile", contact.contactmobile || "");
       step1Form.setValue("contactemergency", contact.contactemergency || "");
 
       const address = safeParse(journeydata.permanent_address);
@@ -346,6 +463,7 @@ const normalizeDate = (date) => {
       step1Form.setValue("commcurrentpincode", comm.commcurrentpincode || "");
     }
   }, [journeydata, step1Form]);
+
   useEffect(() => {
     const unregister = step1Form.unregister;
     if (kycType !== "PAN Card") {
@@ -361,7 +479,6 @@ const normalizeDate = (date) => {
     if (kycType !== "Others") {
       unregister("identityProof");
       unregister("addressProof");
-      // optional: unregister file upload fields too
     }
   }, [kycType, step1Form.unregister]);
 
@@ -372,113 +489,21 @@ const normalizeDate = (date) => {
       </h2>
       <p className="text-gray-500">We’ll begin with some basic information.</p>
       <input type="hidden" {...step1Form.register("step")} value="one" />
-     
 
-      {/* <label className="block font-semibold cursor-pointer">Proposer KYC</label>
-      <div className="flex flex-col sm:flex-row gap-3">
-        {["PAN Card", "Aadhar ( Last 4 Digits )", "Others"].map((type) => (
-          <label
-            key={type}
-            className={`relative flex items-center px-4 py-3 rounded-md border text-sm cursor-pointer w-full transition-all duration-200 ${
-              kycType === type
-                ? "border-gray-400 bg-white"
-                : "border-gray-400 bg-white"
-            }`}
-          >
-            {kycType === type && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-pink-400 rounded-full animate-ping opacity-70"></span>
-            )}
-            <input
-              {...step1Form.register("kycType")}
-              type="checkbox"
-              value={type}
-              checked={kycType === type}
-              onChange={() => setKycType(type)}
-              className="mr-2 accent-pink-500 h-4 w-4"
-            />
+      {/* Hidden inputs to preserve backend payload values */}
+      <input type="hidden" {...step1Form.register("name")} />
+      <input type="hidden" {...step1Form.register("proposaldob")} />
 
-            {type}
-          </label>
-        ))}
-      </div>
-
-
-      {kycType === "PAN Card" && !isPanKycHidden && (
-        <div className="space-y-2">
-          <label className="block font-semibold cursor-pointer">
-            Please Provide PAN Card Info
+      {cardata?.under == "company" && (
+        <div>
+          <label className="block font-semibold text-sm mb-1">
+            Name & Date of Incorporation<span className="text-red-500">*</span>
           </label>
 
-          <div className="flex flex-col md:flex-row gap-4">
-            <input
-              {...step1Form.register("pancardno")}
-              maxLength={10}
-              placeholder="PAN No."
-              className="h-[40px] px-4 border border-gray-300 rounded-md text-sm w-full md:w-[220px]"
-              onChange={(e) => {
-                const upper = e.target.value
-                  .toUpperCase()
-                  .replace(/[^A-Z0-9]/g, "");
-                step1Form.setValue("pancardno", upper);
-              }}
-            />
-
-            <Controller
-              control={step1Form.control}
-              name="pancarddob"
-              rules={{ required: "DOB is required" }}
-              render={({ field, fieldState }) => (
-                <UniversalDatePicker
-                  id="pancarddob"
-                  name="pancarddob"
-                  value={
-                    field.value
-                      ? parse(field.value, "dd-MM-yyyy", new Date())
-                      : null
-                  }
-                  onChange={(date) => {
-                    if (date instanceof Date && !isNaN(date)) {
-                      const formatted = format(date, "dd-MM-yyyy");
-                      field.onChange(formatted);
-                    }
-                   
-                  }}
-                  error={!!fieldState.error}
-                  errorText={fieldState.error?.message}
-                  placeholder="Pick a date"
-                />
-              )}
-            />
-
-            <input
-              type="button"
-              onClick={handleVerifyPan}
-              disabled={isPanAlreadyVerified || loading}
-              value={
-                isPanAlreadyVerified
-                  ? "VERIFIED"
-                  : loading
-                  ? "Verifying..."
-                  : "VERIFY"
-              }
-              className={`px-4 py-2 thmbtn
-      ${isPanAlreadyVerified ? "bg-green-600 cursor-not-allowed" : ""}
-      ${loading ? "opacity-70 cursor-not-allowed" : ""}
-    `}
-            />
-          </div>
-        </div>
-      )}
-
-      {kycType === "Aadhar ( Last 4 Digits )" && (
-        <div className="space-y-2">
-          <label className="block font-medium">
-            Please Provide Aadhar Card Info
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
             <select
-              {...step1Form.register("aadhargender")}
-              className="border border-gray-300 px-3 py-2 rounded w-full text-sm sm:col-span-2"
+              {...step1Form.register("ms")}
+              className={`text-sm md:col-span-2 ${inputClass}`}
             >
               <option value="">Mr/Ms</option>
               <option value="Mr">Mr</option>
@@ -487,84 +512,97 @@ const normalizeDate = (date) => {
             </select>
 
             <input
-              type="text"
-              {...step1Form.register("aadharno")}
-              maxLength={4}
-              onChange={(e) => isNumber(e, step1Form.setValue, "aadharno")}
-              placeholder="AADHAR NO. (LAST 4 DIGIT)"
-              className="border border-gray-300 px-3 py-2 rounded w-full text-sm sm:col-span-5"
+              {...step1Form.register("companyname")}
+              placeholder="Company Name"
+              className={`text-sm w-full md:col-span-6 ${inputClass}`}
             />
 
-            <input
-              type="text"
-              {...step1Form.register("aadharName")}
-              onChange={(e) => isAlpha(e, step1Form.setValue, "aadharName")}
-              placeholder="FULL NAME AS PER AADHAR"
-              className="border border-gray-300 px-3 py-2 rounded w-full text-sm sm:col-span-5"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            <div className="sm:col-span-5">
-               <Controller
-              control={step1Form.control}
-              name="aadharDob"
-              rules={{ required: "DOB is required" }}
-              render={({ field, fieldState }) => (
-                <UniversalDatePicker
-                  id="aadharDob"
-                  name="aadharDob"
-                  value={
-                    field.value
-                      ? parse(field.value, "dd-MM-yyyy", new Date())
-                      : null
-                  }
-                  onChange={(date) => {
-                    if (date instanceof Date && !isNaN(date)) {
-                      const formatted = format(date, "dd-MM-yyyy");
-                      field.onChange(formatted);
+            <div className="md:col-span-4">
+              <Controller
+                control={step1Form.control}
+                name="dobincorporation"
+                rules={{ required: "Please select a valid date" }}
+                render={({ field, fieldState }) => (
+                  <UniversalDatePicker
+                    id="dobincorporation"
+                    name="dobincorporation"
+                    className={inputClass}
+                    value={
+                      field.value
+                        ? parse(field.value, "dd-MM-yyyy", new Date())
+                        : null
                     }
-                    // handleDateChange(
-                    //   "customerpancardno",
-                    //   "customerpancardDob"
-                    // )(date);
-                  }}
-                  error={!!fieldState.error}
-                  errorText={fieldState.error?.message}
-                  placeholder="Pick a date"
-                />
-              )}
-            />
-            </div>
-
-            <div className="sm:col-span-2">
-              <button
-                type="button"
-                onClick={handleVerifyAadhar}
-                className="w-full px-1 py-2 thmbtn flex items-center justify-center gap-2"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <FiLoader className="animate-spin" /> Verifying...
-                  </>
-                ) : (
-                  "VERIFY"
+                    onChange={(date) => {
+                      if (date instanceof Date && !isNaN(date)) {
+                        const formatted = format(date, "dd-MM-yyyy");
+                        field.onChange(formatted);
+                      }
+                    }}
+                    placeholder="Pick a date"
+                    error={!!fieldState.error}
+                    errorText={fieldState.error?.message}
+                  />
                 )}
-              </button>
+              />
             </div>
           </div>
         </div>
-      )} */}
+      )}
+
+      {/* ------------ SINGLE ROW COMPACT UPLOAD DOCUMENT FIELD (2-COLUMN GRID) ------------ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-3">
+        <div className="flex flex-row items-center justify-between p-2.5 px-3 border border-dashed border-cyan-400 rounded-md bg-cyan-50/40 gap-2">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <FiUploadCloud className="text-cyan-600 text-base flex-shrink-0" />
+            <span className="text-xs font-medium text-gray-700 truncate">
+              Quick Auto-Fill via Document OCR
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {docUploaded && (
+              <span className="text-xs text-green-600 flex items-center gap-1 font-medium">
+                <FiCheckCircle /> Filled
+              </span>
+            )}
+            <input
+              type="file"
+              id="doc-quick-upload"
+              className="hidden"
+              accept="image/*,application/pdf"
+              onChange={handleDocumentUpload}
+              disabled={docLoading}
+            />
+            <label
+              htmlFor="doc-quick-upload"
+              className={`px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded cursor-pointer flex items-center gap-1 transition-all whitespace-nowrap ${
+                docLoading ? "opacity-60 cursor-not-allowed" : ""
+              }`}
+            >
+              {docLoading ? (
+                <>
+                  <FiLoader className="animate-spin" /> Uploading...
+                </>
+              ) : (
+                "Upload Doc"
+              )}
+            </label>
+          </div>
+        </div>
+
+        {/* Column 2: Blank Column */}
+        <div></div>
+      </div>
+
       {kycType === "Others" && !isOtherKycHidden && (
         <div className="space-y-6">
-       
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Identity & Address Proofs */}
             {Object.entries(fields).map(([type, options]) => (
               <div key={type}>
-                <label className="labelcls uppercase">{type} Proof Type</label>
+                <label className="labelcls uppercase">
+                  {type} Proof Type <span className="text-xs text-red-500 font-normal lowercase">(pdf only)</span>
+                </label>
 
                 {/* Select Dropdown */}
                 <select
@@ -606,7 +644,7 @@ const normalizeDate = (date) => {
                         Selected:{" "}
                         <span title={fileNames[`${type}-${proofs[type]}`]}>
                           {fileNames[`${type}-${proofs[type]}`]?.slice(0, 30) ||
-                            "Choose File"}
+                            "Choose PDF File"}
                           {fileNames[`${type}-${proofs[type]}`]?.length > 30
                             ? "..."
                             : ""}
@@ -622,14 +660,22 @@ const normalizeDate = (date) => {
                     <input
                       type="file"
                       id={`${type}-${proofs[type]}`}
+                      accept="application/pdf"
                       className="hidden"
-                      onChange={(e) =>
-                        setFileNames({
-                          ...fileNames,
-                          [`${type}-${proofs[type]}`]:
-                            e.target.files?.[0]?.name || "",
-                        })
-                      }
+                      onChange={(e) => {
+                        const selectedFile = e.target.files?.[0];
+                        if (selectedFile) {
+                          if (selectedFile.type !== "application/pdf") {
+                            showError("Only PDF files are allowed for identity/address proofs.");
+                            e.target.value = "";
+                            return;
+                          }
+                          setFileNames({
+                            ...fileNames,
+                            [`${type}-${proofs[type]}`]: selectedFile.name || "",
+                          });
+                        }
+                      }}
                     />
 
                     <input
@@ -653,8 +699,6 @@ const normalizeDate = (date) => {
                       value={proofs[`${type}Value`] || ""}
                       onChange={(e) => {
                         const value = e.target.value;
-                        const rules = proofValidationRules[proofs[type]] || {};
-
                         if (proofs[type] === "AADHAR") {
                           if (/^\d{0,4}$/.test(value)) {
                             setProofs({ ...proofs, [`${type}Value`]: value });
@@ -724,7 +768,6 @@ const normalizeDate = (date) => {
                 insurephoto: mediaPreview,
               };
 
-
               Object.entries(fields).forEach(([type]) => {
                 const selectedProofType = proofs[type];
                 const proofKey = `${type}-${selectedProofType}`;
@@ -772,60 +815,58 @@ const normalizeDate = (date) => {
         </div>
       )}
 
-      {/* {kycVerified && ( */}
-        <div className="space-y-2">
-          <label className="block font-semibold text-sm">
-            Proposer&apos;s details:
-          </label>
+      <div className="space-y-2">
+        <label className="block font-semibold text-sm">
+          Proposer&apos;s details:
+        </label>
 
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-            <select
-              {...step1Form.register("mr_ms_gender")}
-              className="border border-gray-300 px-3 py-2 rounded text-sm md:col-span-2"
-            >
-              <option value="">Mr/Ms</option>
-              <option value="Mr">Mr</option>
-              <option value="Ms">Ms</option>
-              <option value="Mrs">Mrs</option>
-            </select>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+          <select
+            {...step1Form.register("mr_ms_gender")}
+            className="border border-gray-300 px-3 py-2 rounded text-sm md:col-span-2"
+          >
+            <option value="">Mr/Ms</option>
+            <option value="Mr">Mr</option>
+            <option value="Ms">Ms</option>
+            <option value="Mrs">Mrs</option>
+          </select>
 
-            <input
-              {...step1Form.register("proposername")}
-              placeholder="Full Name as per your ID Card"
-              className="border border-gray-300 px-3 py-2 rounded text-sm w-full md:col-span-6"
-            />
+          <input
+            {...step1Form.register("proposername")}
+            placeholder="Full Name as per your ID Card"
+            className="border border-gray-300 px-3 py-2 rounded text-sm w-full md:col-span-6"
+          />
 
-            <div className="md:col-span-4">
-              <Controller
-                control={step1Form.control}
-                name="proposerdob1"
-                rules={{ required: "Please select a valid date" }}
-                render={({ field, fieldState }) => (
-                  <UniversalDatePicker
-                    id="proposerdob1"
-                    name="proposerdob1"
-                    className={inputClass}
-                    value={
-                      field.value
-                        ? parse(field.value, "dd-MM-yyyy", new Date())
-                        : null
+          <div className="md:col-span-4">
+            <Controller
+              control={step1Form.control}
+              name="proposerdob1"
+              rules={{ required: "Please select a valid date" }}
+              render={({ field, fieldState }) => (
+                <UniversalDatePicker
+                  id="proposerdob1"
+                  name="proposerdob1"
+                  className={inputClass}
+                  value={
+                    field.value
+                      ? parse(field.value, "dd-MM-yyyy", new Date())
+                      : null
+                  }
+                  onChange={(date) => {
+                    if (date instanceof Date && !isNaN(date)) {
+                      const formatted = format(date, "dd-MM-yyyy");
+                      field.onChange(formatted);
                     }
-                    onChange={(date) => {
-                      if (date instanceof Date && !isNaN(date)) {
-                        const formatted = format(date, "dd-MM-yyyy");
-                        field.onChange(formatted);
-                      }
-                    }}
-                    placeholder="Pick a date"
-                    error={!!fieldState.error}
-                    errorText={fieldState.error?.message}
-                  />
-                )}
-              />
-            </div>
+                  }}
+                  placeholder="Pick a date"
+                  error={!!fieldState.error}
+                  errorText={fieldState.error?.message}
+                />
+              )}
+            />
           </div>
         </div>
-      {/* )} */}
+      </div>
 
       {cardata?.under == "company" && (
         <div>
@@ -872,6 +913,7 @@ const normalizeDate = (date) => {
           )
         )}
       </div>
+
       <label className="block font-semibold cursor-pointer">
         Communication Address
         <input
