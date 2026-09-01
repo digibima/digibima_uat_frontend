@@ -9,6 +9,7 @@ import constant from "@/env";
 import { format, parse } from "date-fns";
 import { Controller } from "react-hook-form";
 import { getDBData, storeDBData, deleteDBData ,clearDBData} from "@/api";
+import DocumentOcrUpload from "@/components/DocumentOcrUpload";
 
 export default function StepOneForm({
   step1Form,
@@ -78,7 +79,95 @@ export default function StepOneForm({
   const [isKycLocked, setIsKycLocked] = useState(false);
 
 
+const handleOcrData = (data) => {
+  console.log("Extracted OCR Data:", data); 
 
+  const set = (key, val) => {
+    if (val !== undefined && val !== null && String(val).trim() !== "") {
+      step1Form.setValue(key, String(val).trim(), { shouldValidate: true });
+    }
+  };
+
+  set("customerName", data.name);
+  set("proposername", data.name);
+  set("name", data.name);
+
+  if (data.dob) {
+    const formattedDob = data.dob.replace(/\//g, "-");
+    set("customerpancardDob", formattedDob);
+    set("proposerdob1", formattedDob);
+    set("proposaldob", formattedDob);
+  }
+
+  if (data.gender) {
+    const gen = data.gender.toUpperCase();
+    const isFemale = gen.includes("FEMALE") || gen === "F";
+    set("customerGender", isFemale ? "FEMALE" : "MALE");
+    set("mr_ms_gender", isFemale ? "Ms" : "Mr");
+  }
+
+  set("customerMobile", data.mobile);
+  set("contactmobile", data.mobile);
+
+  const fullAddress = data.address || "";
+  
+  const addressParts = fullAddress.split(",").map((part) => part.trim()).filter(Boolean);
+
+  const houseValue =
+    data.house ||
+    data.house_no ||
+    data.building ||
+    data.premise ||
+    (addressParts.length > 0 ? addressParts.slice(0, 2).join(", ") : fullAddress);
+
+  const colonyValue =
+    data.colony ||
+    data.street ||
+    data.area ||
+    data.sector ||
+    (addressParts.length > 2 ? addressParts[2] : "");
+
+  const landmarkValue =
+    data.landmark ||
+    data.landmark_name ||
+    data.locality ||
+    data.location ||
+    (addressParts.length > 3 ? addressParts.slice(3).join(", ") : "");
+
+  set("house", houseValue);
+  set("address", houseValue);
+  set("commcurrenthouse", houseValue);
+
+  set("colony", colonyValue || houseValue);
+  set("commcurrentcolony", colonyValue || houseValue);
+
+  set("Landmark", landmarkValue || houseValue);
+  set("landmark", landmarkValue || houseValue);
+  set("commcurrentLandmark", landmarkValue || houseValue);
+  set("commcurrentlandmark", landmarkValue || houseValue);
+
+  const cityValue = data.city || data.district;
+  set("City", cityValue);
+  set("city", cityValue);
+  set("commcurrentCity", cityValue);
+  set("commcurrentcity", cityValue);
+
+  set("State", data.state);
+  set("state", data.state);
+  set("commcurrentState", data.state);
+  set("commcurrentstate", data.state);
+
+  const pin = data.pincode || fullAddress.match(/\b\d{6}\b/)?.[0];
+  if (pin) {
+    set("Pincode", pin);
+    set("pincode", pin);
+    set("commcurrentPincode", pin);
+    set("commcurrentpincode", pin);
+
+    handlePincodeInput?.({ target: { name: "Pincode", value: pin } });
+    handlePincodeInput?.({ target: { name: "pincode", value: pin } });
+  }
+};
   // STATES TO HIDE KYC SECTIONS
 
   const handleDateChange = useCallback(
@@ -517,6 +606,7 @@ if (Array.isArray(insure)) {
         >
           <option value="SELF">SELF</option>
         </select>
+        <DocumentOcrUpload onExtracted={handleOcrData} id="vendor1-ocr" />
       </div>
       <input type="hidden" {...step1Form.register("oldpincode")} />
       <input
