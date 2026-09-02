@@ -760,6 +760,7 @@ export default function Plans() {
                     setAddAddonModal(true);
                   }}
                   handlePlanSubmit={handlePlanSubmit}
+                  fullAddonsName={fullAddonsName}
                   showCompare={vendorPlans.filter(p => p.socketStatus === "1").length > 1}
                   compared={isCompared(plan)}
                   disableCompare={compareDisabledForOthers && !isCompared(plan)}

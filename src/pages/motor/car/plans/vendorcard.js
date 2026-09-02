@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import Modal from "@/components/modal";
 import {
   FiTag,
@@ -13,6 +13,7 @@ import constant from "@/env";
 
 export default function VendorCard({
   data,
+  fullAddonsName = {},
   onAddonsClick,
   handlePlanSubmit,
   compared = false,
@@ -20,7 +21,7 @@ export default function VendorCard({
   onCompareChange = () => {},
   showCompare = true,
 }) {
-  console.log("data",data)
+   console.log("data",data)
   const [showModal, setShowModal] = useState(false);
   const [selectedPremiumData, setSelectedPremiumData] = useState([]);
   const [showAllUnavailable, setShowAllUnavailable] = useState(false);
@@ -35,6 +36,29 @@ export default function VendorCard({
   const displayTitle = data?.title || data?.productName || data?.productname || data?.vendorname || "Insurance Plan";
   const displayIdv = parseToValidNumber(data?.idv || data?.selectedvalue);
   const displayPrice = parseToValidNumber(data?.price || data?.premium);
+
+const unavailableAddons = useMemo(() => {
+  const notMatchedList =
+    (Array.isArray(data?.notmatched) && data.notmatched.length > 0)
+      ? data.notmatched
+      : (Array.isArray(data?.data?.notmatched) && data.data.notmatched.length > 0)
+      ? data.data.notmatched
+      : [];
+
+  return notMatchedList
+    .map((id) => {
+      const cleanId = String(id).trim();
+      const rawName = fullAddonsName?.[cleanId];
+      if (!rawName) return null;
+
+      return rawName
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\bYN\b/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    })
+    .filter(Boolean);
+}, [data, fullAddonsName]);
 
   const handlePremium = () => {
     const premiumObj = data?.premiumBackup || data?.premium_breakup || data?.premium || {};
@@ -58,21 +82,12 @@ export default function VendorCard({
     setShowModal(true);
   };
 
-  const UNAVAILABLE_ADDONS = [
-    "Zero Depreciation",
-    "Engine Protect",
-    "Roadside Assistance",
-    "Consumables Cover",
-    "Key Replacement",
-  ];
-
   const compareId = `compare-${String(data?.vendorId ?? data?.vid ?? data?.vendorid ?? displayTitle)
     .toLowerCase()
     .replace(/\s+/g, "-")}`;
 
   return (
     <>
-      {/* Card Body Container */}
       <div className="bg-white border border-[#E8ECF3] rounded-[22px] shadow-[0_4px_14px_rgba(15,23,42,0.06)] px-6 py-6 w-full">
         <div className="flex flex-col lg:flex-row lg:justify-between gap-6">
           {/* LEFT SECTION */}
@@ -150,33 +165,36 @@ export default function VendorCard({
                 </div>
               )}
 
-              <div className="mt-4">
-                <h4 className="text-[14px] font-semibold text-[#374151] mb-2">
-                  What’s not included
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {(showAllUnavailable ? UNAVAILABLE_ADDONS : UNAVAILABLE_ADDONS.slice(0, 4)).map((addon, idx) => (
-                    <span
-                      key={idx}
-                      className="bg-[#FFF4F4] text-[#C75C5C] border border-[#FAD6D6] rounded-md px-3 py-1 text-[11px] font-medium"
-                    >
-                      <span className="flex items-center gap-1">
-                        <FiXCircle size={12} className="text-[#D64545]" />
-                        {addon}
+              {/* Dynamic What’s not included section */}
+              {unavailableAddons.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-[14px] font-semibold text-[#374151] mb-2">
+                    What’s not included
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {(showAllUnavailable ? unavailableAddons : unavailableAddons.slice(0, 4)).map((addon, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-[#FFF4F4] text-[#C75C5C] border border-[#FAD6D6] rounded-md px-3 py-1 text-[11px] font-medium capitalize"
+                      >
+                        <span className="flex items-center gap-1">
+                          <FiXCircle size={12} className="text-[#D64545]" />
+                          {addon.toLowerCase()}
+                        </span>
                       </span>
-                    </span>
-                  ))}
-                  {UNAVAILABLE_ADDONS.length > 4 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllUnavailable(!showAllUnavailable)}
-                      className="bg-[#F4F8FF] text-[#4478F9] rounded-md px-3 py-1 text-[11px] font-semibold hover:bg-blue-100 transition-colors"
-                    >
-                      {showAllUnavailable ? "View Less" : `+ View More (${UNAVAILABLE_ADDONS.length - 4})`}
-                    </button>
-                  )}
+                    ))}
+                    {unavailableAddons.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllUnavailable(!showAllUnavailable)}
+                        className="bg-[#F4F8FF] text-[#4478F9] rounded-md px-3 py-1 text-[11px] font-semibold hover:bg-blue-100 transition-colors"
+                      >
+                        {showAllUnavailable ? "View Less" : `+ View More (${unavailableAddons.length - 4})`}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
